@@ -1,0 +1,58 @@
+[
+  {
+    "origin_airports": ["SFO", "OAK"],
+    "destination_airports": ["BUR", "LAX", "ONT"],
+    "min_departure_time": "2016-01-31T17:00:00Z",
+    "max_arrival_time": "2016-01-31T21:00:00Z",
+    "max_fare_cents": 7200,
+    "max_number_stops": 0
+  },
+  {
+    "origin_airports": ["SFO", "OAK"],
+    "destination_airports": ["BUR", "LAX", "ONT"],
+    "min_departure_time": "2016-02-25T17:00:00Z",
+    "max_arrival_time": "2016-02-25T21:00:00Z",
+    "max_fare_cents": 10800,
+    "max_number_stops": 0
+  },
+  {
+    "origin_airports": ["BUR", "LAX"],
+    "destination_airports": ["SFO", "OAK"],
+    "min_departure_time": "2016-02-28T17:00:00Z",
+    "max_arrival_time": "2016-02-28T22:00:00Z",
+    "max_fare_cents": 6700,
+    "max_number_stops": 0
+  },
+  {
+    "origin_airports": ["SFO", "OAK"],
+    "destination_airports": ["BUR", "LAX", "ONT"],
+    "min_departure_time": "2016-03-31T17:00:00Z",
+    "max_arrival_time": "2016-03-31T21:00:00Z",
+    "max_fare_cents": 10800,
+    "max_number_stops": 0
+  },
+  {
+    "origin_airports": ["BUR", "LAX"],
+    "destination_airports": ["SFO", "OAK"],
+    "min_departure_time": "2016-04-03T17:00:00Z",
+    "max_arrival_time": "2016-04-03T22:00:00Z",
+    "max_fare_cents": 10800,
+    "max_number_stops": 0
+  },
+  {
+    "origin_airports": ["SFO", "OAK"],
+    "destination_airports": ["BUR", "LAX", "ONT"],
+    "min_departure_time": "2016-04-21T17:00:00Z",
+    "max_arrival_time": "2016-04-21T21:00:00Z",
+    "max_fare_cents": 10800,
+    "max_number_stops": 0
+  },
+  {
+    "origin_airports": ["BUR", "LAX"],
+    "destination_airports": ["SFO", "OAK"],
+    "min_departure_time": "2016-04-24T17:00:00Z",
+    "max_arrival_time": "2016-04-24T22:00:00Z",
+    "max_fare_cents": 10800,
+    "max_number_stops": 0
+  }
+]
