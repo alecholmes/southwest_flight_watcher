@@ -24,12 +24,22 @@ var (
 )
 
 func (e *EmailFlightsNotifier) Notify(flights []*model.Flight, updates map[model.FlightId]UpdateResult) error {
-	// Remove any flights that are no longer available
+	flightAdded := false
 	filteredFlights := make([]*model.Flight, 0, len(flights))
 	for _, flight := range flights {
+		// Remove any flights that are no longer available
 		if result, ok := updates[*flight.Id()]; !ok || result != Removed {
 			filteredFlights = append(filteredFlights, flight)
 		}
+
+		if result, ok := updates[*flight.Id()]; ok && result == Added {
+			flightAdded = true
+		}
+	}
+
+	// Only send notification if at least one flight's cached value was updated
+	if !flightAdded {
+		return nil
 	}
 
 	flightsByDate := groupByDate(filteredFlights)

@@ -44,7 +44,10 @@ func (c *CheapestFlightCache) Update(flight *model.Flight) UpdateResult {
 		}
 	}
 
-	if oldFlight.CheapestAvailableFare().Cents > newFare.Cents {
+	if newFare == nil {
+		delete(c.cache, id)
+		return Removed
+	} else if newFare.Cents < oldFlight.CheapestAvailableFare().Cents {
 		c.cache[id] = flight
 		return Added
 	} else {
