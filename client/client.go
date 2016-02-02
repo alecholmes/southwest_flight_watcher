@@ -118,7 +118,8 @@ type MaxAvailableFareFilter struct {
 }
 
 func (m *MaxAvailableFareFilter) Matches(flight *model.Flight) bool {
-	return flight.CheapestAvailableFare().Cents <= m.Cents
+	cheapestAvailableFare := flight.CheapestAvailableFare()
+	return cheapestAvailableFare != nil && flight.CheapestAvailableFare().Cents <= m.Cents
 }
 
 // Filter for flights leaving after a time, inclusive.
