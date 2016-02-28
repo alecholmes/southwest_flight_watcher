@@ -83,7 +83,9 @@ func (c *Client) ListFlights(departureDate time.Time, originAirport string, dest
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != 200 {
-		return nil, fmt.Errorf("Unexpected response code listing flights: %d", httpResp.StatusCode)
+
+		body, _ := ioutil.ReadAll(httpResp.Body)
+		return nil, fmt.Errorf("Unexpected response code listing flights. req=%s, statusCode=%d, body=%s", httpReq, httpResp.StatusCode, string(body))
 	} else if httpResp.Body == nil {
 		return nil, fmt.Errorf("No body listing flights")
 	}
