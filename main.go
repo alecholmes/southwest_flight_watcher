@@ -57,7 +57,7 @@ func main() {
 		return
 	}
 
-	config, err := app.FlightSearchesFromFile(*searchesFlag)
+	searches, err := app.FlightSearchesFromFile(*searchesFlag)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Invalid searches file contents: %v\n", err)
 		return
@@ -84,7 +84,7 @@ func main() {
 	}
 
 	// Create container for state with the function to update it
-	state := app.NewCheapestFlightState(newFlightFetcher(config), notifier)
+	state := app.NewCheapestFlightState(searches, app.NewFlightFetcher(client.NewClient(nil)), notifier)
 
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 	updater := func() {
@@ -131,36 +131,6 @@ func loadPassword(filename string) (string, error) {
 		return password, nil
 	}
 	return "", err
-}
-
-func newFlightFetcher(searches []*app.FlightSearch) app.FlightsFetcher {
-	return func() ([]*model.Flight, error) {
-		swClient := client.NewClient(nil)
-
-		allFlights := make([]*model.Flight, 0)
-		for _, search := range searches {
-			filters := make([]client.FlightFilter, 0)
-			if search.MaxFareCents != nil {
-				filters = append(filters, &client.MaxAvailableFareFilter{*search.MaxFareCents})
-			}
-			if search.MaxNumberStops != nil {
-				filters = append(filters, &client.MaxStopsFilter{int(*search.MaxNumberStops)})
-			}
-
-			flights, err := swClient.SearchFlights(
-				search.OriginAirports,
-				search.DestinationAirports,
-				search.MinDepartureTime,
-				search.MaxArrivalTime,
-				filters)
-			if err != nil {
-				return nil, err
-			}
-			allFlights = append(allFlights, flights...)
-		}
-
-		return allFlights, nil
-	}
 }
 
 func stdoutFlightsNotifier(flights []*model.Flight, updates map[model.FlightId]app.UpdateResult) error {
