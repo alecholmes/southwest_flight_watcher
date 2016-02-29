@@ -125,9 +125,10 @@ type Body struct {
 }
 
 type SearchGroup struct {
-	Date  string
-	Note  *string
-	Trips []*Trip
+	Date    string
+	MaxFare *string
+	Note    *string
+	Trips   []*Trip
 }
 
 type Trip struct {
@@ -158,11 +159,18 @@ func newBody(searches FlightSearchStates) *Body {
 			})
 		}
 
-		searchGroups = append(searchGroups, &SearchGroup{
+		searchGroup := &SearchGroup{
 			Date:  search.MinDepartureTime.Format("Mon Jan 2 2006"),
 			Note:  search.Note,
 			Trips: trips,
-		})
+		}
+
+		if search.MaxFareCents != nil {
+			maxFare := fmt.Sprintf("$ %d.%02d", *search.MaxFareCents/100, *search.MaxFareCents%100)
+			searchGroup.MaxFare = &maxFare
+		}
+
+		searchGroups = append(searchGroups, searchGroup)
 	}
 	return &Body{SearchGroups: searchGroups}
 }
@@ -174,7 +182,8 @@ var htmlTemplateDef = `
     {{range .SearchGroups}}
       <div>
         <h3 style="margin-bottom: 3px;">{{.Date}}</h3>
-        {{.Note}}
+        {{if .Cost}}</i>Max {{.Cost}}</i>{{end}}
+        {{if .Note}}<i>({{.Note}})</i>{{end}}
         <table style="border-collapse: collapse">
           <thead>
             <th colspan="2" style="text-align: left; padding: 0px 15px 0px 0px">From</th>
