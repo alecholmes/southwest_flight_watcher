@@ -11,6 +11,11 @@ import (
 	"github.com/alecholmes/southwest_flight_watcher/model"
 )
 
+var (
+	htmlTemplate = template.Must(template.New("EmailFlightsNotifier").Parse(htmlTemplateDef))
+	mime         = "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
+)
+
 type EmailFlightsNotifier struct {
 	SmtpAddress string
 	Auth        smtp.Auth
@@ -18,35 +23,19 @@ type EmailFlightsNotifier struct {
 	To          string
 }
 
-var (
-	htmlTemplate = template.Must(template.New("EmailFlightsNotifier").Parse(htmlTemplateDef))
-	mime         = "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
-)
+var _ SearchUpdateNotifier = &EmailFlightsNotifier{}
 
-func (e *EmailFlightsNotifier) Notify(flights []*model.Flight, updates map[model.FlightId]UpdateResult) error {
-	flightAdded := false
-	filteredFlights := make([]*model.Flight, 0, len(flights))
-	for _, flight := range flights {
-		// Remove any flights that are no longer available
-		if result, ok := updates[*flight.Id()]; !ok || result != Removed {
-			filteredFlights = append(filteredFlights, flight)
-		}
+func (e *EmailFlightsNotifier) Notify(searchStates FlightSearchStates) error {
+	available, added := searchStates.OnlyAvailable()
 
-		if result, ok := updates[*flight.Id()]; ok && result == Added {
-			flightAdded = true
-		}
-	}
-
-	// Only send notification if at least one flight's cached value was updated
-	if !flightAdded {
+	// Only send notification if there are flights and at least one flight was updated
+	if !added || len(available) == 0 {
 		return nil
 	}
 
-	flightsByDate := groupByDate(filteredFlights)
-
 	// Create body from template
 	var bodyBuffer bytes.Buffer
-	err := htmlTemplate.Execute(&bodyBuffer, newBody(flightsByDate))
+	err := htmlTemplate.Execute(&bodyBuffer, newBody(available))
 	if err != nil {
 		return err
 	}
@@ -83,6 +72,44 @@ func date(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }
 
+// Helper to sort FlightSearch by MinDepartureTime
+type FlightSearchByMinDepartureTime []*FlightSearch
+
+func (b FlightSearchByMinDepartureTime) Len() int      { return len(b) }
+func (b FlightSearchByMinDepartureTime) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
+func (b FlightSearchByMinDepartureTime) Less(i, j int) bool {
+	return b[i].MinDepartureTime.Before(b[j].MinDepartureTime)
+}
+
+func sortedFlightSearches(s FlightSearchStates) []*FlightSearch {
+	searches := make([]*FlightSearch, 0, len(s))
+	for search, _ := range s {
+		searches = append(searches, search)
+	}
+	sort.Sort(FlightSearchByMinDepartureTime(searches))
+
+	return searches
+}
+
+// Helper to sort CurrentState by flight DepartureLocalTime
+type CurrentStateByDepartureLocalTime []CurrentState
+
+func (b CurrentStateByDepartureLocalTime) Len() int      { return len(b) }
+func (b CurrentStateByDepartureLocalTime) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
+func (b CurrentStateByDepartureLocalTime) Less(i, j int) bool {
+	return b[i].Flight.DepartureLocalTime.Before(b[j].Flight.DepartureLocalTime)
+}
+
+func sortedCurrentStates(u map[model.FlightId]CurrentState) []CurrentState {
+	updates := make([]CurrentState, 0, len(u))
+	for _, update := range u {
+		updates = append(updates, update)
+	}
+	sort.Sort(CurrentStateByDepartureLocalTime(updates))
+
+	return updates
+}
+
 // Helper to sort Flights by time
 type FlightsByDepartureTime []*model.Flight
 
@@ -92,29 +119,14 @@ func (b FlightsByDepartureTime) Less(i, j int) bool {
 	return b[i].DepartureLocalTime.Before(b[j].DepartureLocalTime)
 }
 
-// Helper to sort Times
-type ByTime []time.Time
-
-func (b ByTime) Len() int           { return len(b) }
-func (b ByTime) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
-func (b ByTime) Less(i, j int) bool { return b[i].Before(b[j]) }
-
-func sortedDates(groups map[time.Time][]*model.Flight) []time.Time {
-	dates := make([]time.Time, 0, len(groups))
-	for date, _ := range groups {
-		dates = append(dates, date)
-	}
-	sort.Sort(ByTime(dates))
-	return dates
-}
-
 // Structs that map to HTML template
 type Body struct {
-	DateGroups []*DateGroup
+	SearchGroups []*SearchGroup
 }
 
-type DateGroup struct {
+type SearchGroup struct {
 	Date  string
+	Note  *string
 	Trips []*Trip
 }
 
@@ -127,37 +139,42 @@ type Trip struct {
 	Cost               string
 }
 
-func newBody(flightsByDate map[time.Time][]*model.Flight) *Body {
-	dateGroups := make([]*DateGroup, 0, len(flightsByDate))
-	dates := sortedDates(flightsByDate)
-	for _, date := range dates {
-		trips := make([]*Trip, 0, len(flightsByDate[date]))
-		for _, flight := range flightsByDate[date] {
-			fareCents := flight.CheapestAvailableFare().Cents
+func newBody(searches FlightSearchStates) *Body {
+	searchGroups := make([]*SearchGroup, 0, len(searches))
+
+	for _, search := range sortedFlightSearches(searches) {
+		updates := searches[search]
+		trips := make([]*Trip, 0, len(updates))
+
+		for _, update := range sortedCurrentStates(updates) {
+			fareCents := update.Flight.CheapestAvailableFare().Cents
 			trips = append(trips, &Trip{
-				OriginAirport:      flight.OriginAirport,
-				DestinationAirport: flight.DestinationAirport,
-				DepartureTime:      flight.DepartureLocalTime.Format("3:04 PM"),
-				ArrivalTime:        flight.ArrivalLocalTime.Format("3:04 PM"),
-				Stops:              len(flight.Stops),
+				OriginAirport:      update.Flight.OriginAirport,
+				DestinationAirport: update.Flight.DestinationAirport,
+				DepartureTime:      update.Flight.DepartureLocalTime.Format("3:04 PM"),
+				ArrivalTime:        update.Flight.ArrivalLocalTime.Format("3:04 PM"),
+				Stops:              len(update.Flight.Stops),
 				Cost:               fmt.Sprintf("$ %d.%02d", fareCents/100, fareCents%100),
 			})
 		}
-		dateGroups = append(dateGroups, &DateGroup{
-			Date:  date.Format("Mon Jan 2 2006"),
+
+		searchGroups = append(searchGroups, &SearchGroup{
+			Date:  search.MinDepartureTime.Format("Mon Jan 2 2006"),
+			Note:  search.Note,
 			Trips: trips,
 		})
 	}
-	return &Body{DateGroups: dateGroups}
+	return &Body{SearchGroups: searchGroups}
 }
 
 var htmlTemplateDef = `
 <html>
   <head></head>
   <body style="font-family: Arial, Helvetica, sans-serif">
-    {{range .DateGroups}}
+    {{range .SearchGroups}}
       <div>
         <h3 style="margin-bottom: 3px;">{{.Date}}</h3>
+        {{.Note}}
         <table style="border-collapse: collapse">
           <thead>
             <th colspan="2" style="text-align: left; padding: 0px 15px 0px 0px">From</th>
