@@ -13,7 +13,6 @@ import (
 
 	"github.com/alecholmes/southwest_flight_watcher/app"
 	"github.com/alecholmes/southwest_flight_watcher/client"
-	"github.com/alecholmes/southwest_flight_watcher/model"
 )
 
 const (
@@ -68,20 +67,14 @@ func main() {
 	signal.Notify(sigChannel, os.Interrupt, os.Kill)
 
 	// Create an email notifier
-	emailNotifier := app.EmailFlightsNotifier{
+	emailNotifier := &app.EmailFlightsNotifier{
 		SmtpAddress: fmt.Sprintf("%v:%v", *smtpFlag, smtpPort),
 		Auth:        smtp.PlainAuth("", *fromFlag, password, *smtpFlag),
 		From:        *fromFlag,
 		To:          *fromFlag,
 	}
 
-	// Compose a notifier from stdoutFlightsNotifier and emailNotifier
-	notifier := func(flights []*model.Flight, updates map[model.FlightId]app.UpdateResult) error {
-		if err := stdoutFlightsNotifier(flights, updates); err != nil {
-			return err
-		}
-		return emailNotifier.Notify(flights, updates)
-	}
+	notifier := app.SearchUpdateNotifierChain{&app.StdoutNotifier{}, emailNotifier}
 
 	// Create container for state with the function to update it
 	state := app.NewCheapestFlightState(searches, app.NewFlightFetcher(client.NewClient(nil)), notifier)
@@ -131,21 +124,4 @@ func loadPassword(filename string) (string, error) {
 		return password, nil
 	}
 	return "", err
-}
-
-func stdoutFlightsNotifier(flights []*model.Flight, updates map[model.FlightId]app.UpdateResult) error {
-	for _, flight := range flights {
-		updateResult, ok := updates[*flight.Id()]
-		if !ok {
-			updateResult = app.Unchanged
-		}
-
-		fmt.Printf("(%v) %v %v -> %v %v: $%v\n",
-			updateResult,
-			flight.OriginAirport, flight.DepartureLocalTime,
-			flight.DestinationAirport, flight.ArrivalLocalTime,
-			flight.CheapestAvailableFare().Cents)
-	}
-
-	return nil
 }

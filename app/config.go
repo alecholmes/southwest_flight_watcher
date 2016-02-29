@@ -14,6 +14,7 @@ type FlightSearch struct {
 	MaxArrivalTime      time.Time `json:"max_arrival_time"`
 	MaxFareCents        *uint32   `json:"max_fare_cents"`
 	MaxNumberStops      *uint8    `json:"max_number_stops"`
+	Note                *string   `json:"note"`
 }
 
 func FlightSearchesFromJson(data []byte) ([]*FlightSearch, error) {
@@ -30,4 +31,12 @@ func FlightSearchesFromFile(filename string) ([]*FlightSearch, error) {
 		return nil, err
 	}
 	return FlightSearchesFromJson(data)
+}
+
+func (f *FlightSearch) String() string {
+	b, err := json.Marshal(f)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
 }
