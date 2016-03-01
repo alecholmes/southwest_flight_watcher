@@ -4,91 +4,85 @@ import (
 	"github.com/alecholmes/southwest_flight_watcher/model"
 )
 
-type CurrentState struct {
+type FlightStateChange int
+
+const (
+	Unchanged FlightStateChange = iota
+	FareIncrease
+	FareDecrease
+	Added
+	Removed
+)
+
+type FlightState struct {
 	Flight *model.Flight
-	Update UpdateResult
+	Update FlightStateChange
 }
 
-type FlightSearchStates map[*FlightSearch]map[model.FlightId]CurrentState
+type FlightStates map[model.FlightId]FlightState
 
-func (f FlightSearchStates) UpdateFlight(search *FlightSearch, flight *model.Flight, update UpdateResult) {
-	flightIdUpdate, ok := f[search]
-	if !ok {
-		f[search] = make(map[model.FlightId]CurrentState)
-	}
-	flightIdUpdate[*flight.Id()] = CurrentState{flight, update}
-}
-
-func (f FlightSearchStates) OnlyAvailable() (available FlightSearchStates, added bool) {
-	available = make(FlightSearchStates)
-	for search, updatesByFlightId := range f {
-		updates := make(map[model.FlightId]CurrentState)
-		for flightId, update := range updatesByFlightId {
-			if update.Update == Added {
-				added = true
-			}
-			if update.Update != Removed {
-				updates[flightId] = update
+func (s FlightStates) Update(flights []*model.Flight) {
+	for _, f := range flights {
+		change := Unchanged
+		existing, ok := s[*f.Id()]
+		if !ok {
+			change = Added
+		} else {
+			fareChange := f.CheapestAvailableFare().Compare(existing.Flight.CheapestAvailableFare())
+			if fareChange > 0 {
+				change = FareIncrease
+			} else if fareChange < 0 {
+				change = FareDecrease
 			}
 		}
 
-		if len(updates) > 0 {
-			available[search] = updates
+		s[*f.Id()] = FlightState{f, change}
+	}
+}
+
+func (s FlightStates) OnlyAvailable() (available FlightStates, improved bool) {
+	available = make(FlightStates)
+	for id, state := range s {
+		if state.Update != Removed {
+			available[id] = state
+		}
+		if state.Update == Added || state.Update == FareDecrease {
+			improved = true
 		}
 	}
 	return
 }
 
-// Function that takes all flights, and latest updates to those flights.
-// Absence of value in the map indicates no change to flight.
-// type FlightsNotifier func([]*model.Flight, map[model.FlightId]UpdateResult) error
+type FlightSearchStates map[*FlightSearch]FlightStates
 
-// Container to keep and update flight state.
-type CheapestFlightState struct {
-	state    FlightSearchStates
-	cache    *CheapestFlightCache
-	fetcher  *FlightFetcher
-	notifier SearchUpdateNotifier
+func NewFlightSearchStates() FlightSearchStates {
+	return make(FlightSearchStates)
 }
 
-func NewCheapestFlightState(searches []*FlightSearch, fetcher *FlightFetcher, notifier SearchUpdateNotifier) *CheapestFlightState {
-	s := &CheapestFlightState{
-		state:    make(FlightSearchStates),
-		cache:    NewCheapestFlightCache(),
-		fetcher:  fetcher,
-		notifier: notifier,
-	}
-
-	for _, search := range searches {
-		s.state[search] = make(map[model.FlightId]CurrentState)
-	}
-
-	return s
+func (f FlightSearchStates) Update(search *FlightSearch, flights []*model.Flight) {
+	f.getFlightStates(search).Update(flights)
 }
 
-// Fetch latest flight info, apply it to cached values, and send updates to the notifier.
-func (c *CheapestFlightState) Update() error {
-	updates := make(map[model.FlightId]UpdateResult)
-	for search, _ := range c.state {
-		flights, err := c.fetcher.Fetch(search)
-		if err != nil {
-			return err
-		}
+func (f FlightSearchStates) OnlyAvailable() (available FlightSearchStates, improved bool) {
+	available = make(FlightSearchStates)
 
-		for _, flight := range flights {
-			var result UpdateResult
-			if _, ok := updates[*flight.Id()]; !ok {
-				result = c.cache.Update(flight)
-				updates[*flight.Id()] = result
-			} else {
-				result = updates[*flight.Id()]
+	for search, states := range f {
+		availableStates, statesImproved := states.OnlyAvailable()
+		if len(availableStates) > 0 {
+			available[search] = availableStates
+			if statesImproved {
+				improved = true
 			}
-
-			c.state.UpdateFlight(search, flight, result)
 		}
 	}
+	return
+}
 
-	c.notifier.Notify(c.state)
-
-	return nil
+func (f FlightSearchStates) getFlightStates(search *FlightSearch) FlightStates {
+	states, ok := f[search]
+	if !ok {
+		states = make(FlightStates)
+		f[search] = states
+	}
+	return states
 }

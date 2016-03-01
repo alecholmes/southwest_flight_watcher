@@ -26,10 +26,10 @@ type EmailFlightsNotifier struct {
 var _ SearchUpdateNotifier = &EmailFlightsNotifier{}
 
 func (e *EmailFlightsNotifier) Notify(searchStates FlightSearchStates) error {
-	available, added := searchStates.OnlyAvailable()
+	available, improved := searchStates.OnlyAvailable()
 
 	// Only send notification if there are flights and at least one flight was updated
-	if !added || len(available) == 0 {
+	if !improved || len(available) == 0 {
 		return nil
 	}
 
@@ -46,6 +46,7 @@ func (e *EmailFlightsNotifier) Notify(searchStates FlightSearchStates) error {
 		"Subject: Southwest Flight Price Update\n" +
 		mime + "\n\n" +
 		bodyBuffer.String() + "\n"
+
 	return smtp.SendMail(e.SmtpAddress, e.Auth, e.From, []string{e.To}, []byte(msg))
 }
 
@@ -91,21 +92,21 @@ func sortedFlightSearches(s FlightSearchStates) []*FlightSearch {
 	return searches
 }
 
-// Helper to sort CurrentState by flight DepartureLocalTime
-type CurrentStateByDepartureLocalTime []CurrentState
+// Helper to sort FlightState by flight DepartureLocalTime
+type FlightStateByDepartureLocalTime []FlightState
 
-func (b CurrentStateByDepartureLocalTime) Len() int      { return len(b) }
-func (b CurrentStateByDepartureLocalTime) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
-func (b CurrentStateByDepartureLocalTime) Less(i, j int) bool {
+func (b FlightStateByDepartureLocalTime) Len() int      { return len(b) }
+func (b FlightStateByDepartureLocalTime) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
+func (b FlightStateByDepartureLocalTime) Less(i, j int) bool {
 	return b[i].Flight.DepartureLocalTime.Before(b[j].Flight.DepartureLocalTime)
 }
 
-func sortedCurrentStates(u map[model.FlightId]CurrentState) []CurrentState {
-	updates := make([]CurrentState, 0, len(u))
+func sortedFlightStates(u map[model.FlightId]FlightState) []FlightState {
+	updates := make([]FlightState, 0, len(u))
 	for _, update := range u {
 		updates = append(updates, update)
 	}
-	sort.Sort(CurrentStateByDepartureLocalTime(updates))
+	sort.Sort(FlightStateByDepartureLocalTime(updates))
 
 	return updates
 }
@@ -147,7 +148,7 @@ func newBody(searches FlightSearchStates) *Body {
 		updates := searches[search]
 		trips := make([]*Trip, 0, len(updates))
 
-		for _, update := range sortedCurrentStates(updates) {
+		for _, update := range sortedFlightStates(updates) {
 			fareCents := update.Flight.CheapestAvailableFare().Cents
 			trips = append(trips, &Trip{
 				OriginAirport:      update.Flight.OriginAirport,
@@ -182,7 +183,7 @@ var htmlTemplateDef = `
     {{range .SearchGroups}}
       <div>
         <h3 style="margin-bottom: 3px;">{{.Date}}</h3>
-        {{if .Cost}}</i>Max {{.Cost}}</i>{{end}}
+        {{if .MaxFare}}<i>Max {{.MaxFare}}</i>{{end}}
         {{if .Note}}<i>({{.Note}})</i>{{end}}
         <table style="border-collapse: collapse">
           <thead>

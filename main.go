@@ -77,7 +77,7 @@ func main() {
 	notifier := app.SearchUpdateNotifierChain{&app.StdoutNotifier{}, emailNotifier}
 
 	// Create container for state with the function to update it
-	state := app.NewCheapestFlightState(searches, app.NewFlightFetcher(client.NewClient(nil)), notifier)
+	state := app.NewSearchStateUpdater(searches, app.NewFlightFetcher(client.NewClient(nil)), notifier)
 
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 	updater := func() {
