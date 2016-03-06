@@ -1,5 +1,9 @@
 package app
 
+import (
+	"time"
+)
+
 // Container to keep and update flight state.
 type SearchStateUpdater struct {
 	states   FlightSearchStates
@@ -21,12 +25,15 @@ func NewSearchStateUpdater(searches []*FlightSearch, fetcher *FlightFetcher, not
 
 // Fetch latest flight info, update state, and send updates to the notifier.
 func (c *SearchStateUpdater) Update() error {
+	today := date(time.Now())
 	for _, search := range c.searches {
-		flights, err := c.fetcher.Fetch(search)
-		if err != nil {
-			return err
+		if !today.After(date(search.MinDepartureTime)) {
+			flights, err := c.fetcher.Fetch(search)
+			if err != nil {
+				return err
+			}
+			c.states.Update(search, flights)
 		}
-		c.states.Update(search, flights)
 	}
 
 	if err := c.notifier.Notify(c.states); err != nil {

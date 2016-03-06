@@ -23,7 +23,7 @@ var (
 		},
 	}
 
-  htmlTemplate = template.Must(template.New("HtmlBody").Funcs(funcMap).Parse(htmlTemplateDef))
+	htmlTemplate = template.Must(template.New("HtmlBody").Funcs(funcMap).Parse(htmlTemplateDef))
 )
 
 func BodyToHTML(body *Body) (string, error) {
