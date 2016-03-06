@@ -19,6 +19,7 @@ const (
 	smtpPort            = 587
 	searchesFlagStr     = "searchesFile"
 	fromFlagStr         = "from"
+	toFlagStr           = "to"
 	smtpFlagStr         = "smtp"
 	smtpPasswordFileStr = "smtpPasswordFile"
 )
@@ -26,6 +27,7 @@ const (
 func main() {
 	searchesFlag := flag.String(searchesFlagStr, "", "filename of flight searches JSON")
 	fromFlag := flag.String(fromFlagStr, "", "email address from which updates are sent")
+	toFlag := flag.String(toFlagStr, "", "email address to which updates are sent")
 	smtpFlag := flag.String(smtpFlagStr, "", fmt.Sprintf("SMTP host for mail delivery. Port %i is used.", smtpPort))
 	smtpPasswordFileFlag := flag.String(smtpPasswordFileStr, "", "File containing SMTP password. Must have 0700 permissions.")
 
@@ -67,11 +69,15 @@ func main() {
 	signal.Notify(sigChannel, os.Interrupt, os.Kill)
 
 	// Create an email notifier
+	to := *toFlag
+	if len(to) == 0 {
+		to = *fromFlag
+	}
 	emailNotifier := &app.EmailFlightsNotifier{
 		SmtpAddress: fmt.Sprintf("%v:%v", *smtpFlag, smtpPort),
 		Auth:        smtp.PlainAuth("", *fromFlag, password, *smtpFlag),
 		From:        *fromFlag,
-		To:          *fromFlag,
+		To:          to,
 	}
 
 	notifier := app.SearchUpdateNotifierChain{&app.StdoutNotifier{}, emailNotifier}
