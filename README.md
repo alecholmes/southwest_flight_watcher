@@ -67,7 +67,10 @@ The file should contain an array of searches.
     "max_fare_cents": 7200,
     
     // Optional. The maximum number of stops allowed. 0 is a direct flight.
-    "max_number_stops": 0
+    "max_number_stops": 0,
+
+    // Optional. Note describing the search, included in the email."
+    "note": "Description shown in email"
   }
 ]
 ```
