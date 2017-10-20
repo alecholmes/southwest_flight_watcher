@@ -15,14 +15,14 @@ import (
 
 const (
 	apiKeyHeader = "X-API-Key"
-	apiKeyValue  = "l7xx8d8bfce4ee874269bedc02832674129b"
+	apiKeyValue  = "l7xx12ebcbc825eb480faa276e7f192d98d1"
 
 	userAgentHeader = "User-Agent"
 	userAgentValue  = "Southwest/3.0.26 (iPhone; iOS 9.1; Scale/2.00)"
 )
 
 var (
-	apiExtensionsBaseUrl = parseUrlOrPanic("https://api-extensions.southwest.com")
+	apiExtensionsBaseUrl = parseUrlOrPanic("https://mobile.southwest.com")
 )
 
 type Client struct {
@@ -51,7 +51,7 @@ func (c *Client) ListFlights(departureDate time.Time, originAirport string, dest
 		return nil, err
 	}
 
-	url, err := url.Parse("/v1/mobile/flights/products")
+	url, err := url.Parse("/api/extensions/v1/mobile/flights/products")
 	if err != nil {
 		return nil, err
 	}
