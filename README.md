@@ -1,5 +1,9 @@
 # Southwest Flight Watcher
 
+## ⚠️ Currently Broken ⚠️
+
+The Southwest API this app uses to query for flights no longer works. Unless a replacement becomes available, this project will not work.
+
 ## Introduction
 
 Southwest Price Watcher is an application that constantly searches for Southwest flights that meet certain criteria, emailing the search results when they change. It is useful for monitoring for drops in flight prices.
